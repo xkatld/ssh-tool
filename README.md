@@ -1,22 +1,28 @@
-# SSH连接和文件传输工具使用教程
+# SSH连接工具使用教程
 
 ## 1. 准备工作
 
-在使用本工具之前，请确保：
+在使用此工具之前，请确保您的系统满足以下要求：
 
-1. 已安装python3 3.6或更高版本。
-2. 安装所需的python3库。在命令行中运行：
+1. 安装了 Python 3.6 或更高版本。
+2. 安装了必要的 Python 库。您可以通过以下命令安装：
    ```
-   pip install paramiko configparser
+   pip install paramiko cryptography
    ```
-3. 在脚本同目录下准备以下文件：
-   - `username.txt`: 包含要尝试的用户名列表，每行一个。
-   - `password.txt`: 包含要尝试的密码列表，每行一个。
-   - `config.ini`: 配置文件，包含SMTP服务器信息。
 
-## 2. 配置文件设置
+## 2. 文件准备
 
-创建一个名为`config.ini`的文件，内容如下：
+在运行脚本之前，您需要准备以下文件：
+
+1. `username.txt`：包含要尝试的用户名列表，每行一个用户名。
+2. `password.txt`：包含要尝试的密码列表，每行一个密码。
+3. `config.ini`：（可选）如果您想使用邮件通知功能，需要创建此配置文件。
+
+将这些文件放在与脚本相同的目录下。
+
+### config.ini 示例
+
+如果您想使用邮件通知功能，请修改 `config.ini` 文件，内容如下：
 
 ```ini
 [smtp]
@@ -24,40 +30,38 @@ server = smtp.example.com
 port = 587
 use_tls = true
 sender = your_email@example.com
-password = your_password_or_app_password
+password = your_email_password
 receivers = receiver1@example.com, receiver2@example.com
 ```
 
-根据您的邮箱服务提供商，修改相应的设置。
+请根据您的实际邮箱设置修改这些值。
 
 ## 3. 使用方法
 
-本工具有三种主要功能：SSH客户端连接、SSH RSA密钥连接和文件传输。
+1. 打开终端或命令提示符。
+2. 导航到脚本所在的目录。
+3. 运行以下命令：
 
-### 3.1 SSH客户端连接
+   ```
+   python sshtool.py [-C] <hostname>
+   ```
 
-使用用户名和密码尝试SSH连接：
+   其中，`<hostname>` 是目标主机的 IP 地址或域名。`-C` 参数是可选的。
 
-```
-python3 sshtool.py -C <hostname>
-```
+   例如：
+   ```
+   python sshtool.py 192.168.1.100
+   ```
+   或
+   ```
+   python sshtool.py -C example.com
+   ```
 
-### 3.2 SSH RSA密钥连接
+## 4. 运行过程
 
-使用RSA密钥尝试SSH连接：
-
-```
-python3 sshtool.py -R <hostname>
-```
-
-执行后，程序会提示输入RSA私钥文件的路径，以及是否需要密码。
-
-### 3.3 文件传输
-
-进行文件上传或下载：
-
-```
-python3 sshtool.py -T <hostname>
-```
-
-执行后，程序会提示选择上传或下载，然后输入相应的本地和远程文件路径。
+1. 脚本开始运行后，会显示一个 banner，包含版本信息。
+2. 然后，它会开始尝试使用 `username.txt` 和 `password.txt` 中的组合连接目标主机。
+3. 在尝试过程中，屏幕上会实时显示当前的尝试次数。
+4. 如果成功建立连接，脚本会立即显示成功信息，包括正确的用户名和密码，以及尝试次数。
+5. 如果配置了邮件通知，脚本会尝试发送一封包含成功信息的邮件。
+6. 成功后，程序会自动退出。
