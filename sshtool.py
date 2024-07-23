@@ -17,6 +17,7 @@ import logging
 import warnings
 import threading
 from queue import Queue
+from cryptography.utils import CryptographyDeprecationWarning
 
 # 隐藏警告
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
@@ -30,7 +31,7 @@ logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 # 程序banner
 BANNER = """
 SSH连接工具
-版本: 1.8
+版本: 1.9
 时间: 2024/7/23
 """
 
