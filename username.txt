@@ -1,6 +1,6 @@
+root
 kali
 admin
-root
 administrator
 system
 sa
