@@ -39,7 +39,7 @@ receivers = receiver1@example.com, receiver2@example.com
 使用用户名和密码尝试SSH连接：
 
 ```
-python3 script.py -C <hostname>
+python3 sshtool.py -C <hostname>
 ```
 
 ### 3.2 SSH RSA密钥连接
@@ -47,7 +47,7 @@ python3 script.py -C <hostname>
 使用RSA密钥尝试SSH连接：
 
 ```
-python3 script.py -R <hostname>
+python3 sshtool.py -R <hostname>
 ```
 
 执行后，程序会提示输入RSA私钥文件的路径，以及是否需要密码。
@@ -57,7 +57,7 @@ python3 script.py -R <hostname>
 进行文件上传或下载：
 
 ```
-python3 script.py -T <hostname>
+python3 sshtool.py -T <hostname>
 ```
 
 执行后，程序会提示选择上传或下载，然后输入相应的本地和远程文件路径。
