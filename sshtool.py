@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # 程序banner
 BANNER = """
 SSH连接工具
-版本: 1.5
+版本: 1.6
 时间: 2024/7/23
 """
 
@@ -43,7 +43,7 @@ def ssh_connect(hostname, port, username, password):
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        ssh_client.connect(hostname, port=port, username=username, password=password)
+        ssh_client.connect(hostname, port=port, username=username, password=password, timeout=10)
         return ssh_client
     except Exception:
         return None
@@ -137,11 +137,17 @@ def main():
     """主函数"""
     print(BANNER)
 
-    if len(sys.argv) != 2:
-        print("用法: python script.py <hostname>")
+    if len(sys.argv) not in [2, 3]:
+        print("用法: python script.py [-C] <hostname>")
         sys.exit(1)
 
-    hostname = sys.argv[1]
+    if len(sys.argv) == 2:
+        hostname = sys.argv[1]
+    else:
+        if sys.argv[1] != '-C':
+            print("无效的参数。使用 -C 或直接输入主机名。")
+            sys.exit(1)
+        hostname = sys.argv[2]
 
     try:
         success = ssh_client_connection(hostname)
