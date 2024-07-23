@@ -3,6 +3,10 @@
 
 import os
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
+import warnings
+from cryptography.utils import CryptographyDeprecationWarning
+
+warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
 import paramiko
 import sys
