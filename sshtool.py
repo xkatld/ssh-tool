@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
+os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
+
 import paramiko
 import sys
 import smtplib
 import socket
-import os
 import configparser
 import datetime
 import time
@@ -14,13 +16,9 @@ from email.mime.text import MIMEText
 from email.header import Header
 from pathlib import Path
 import logging
-import warnings
 import threading
 from queue import Queue
-from cryptography.utils import CryptographyDeprecationWarning
-
-# 隐藏警告
-warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+from multiprocessing import Value
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,7 +29,7 @@ logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 # 程序banner
 BANNER = """
 SSH连接工具
-版本: 1.9
+版本: 2.0
 时间: 2024/7/23
 """
 
@@ -86,7 +84,7 @@ def ssh_client_connection(hostname):
             q.put((username, password))
 
     success_event = threading.Event()
-    attempt_count = threading.Value('i', 0)
+    attempt_count = Value('i', 0)
     threads = []
     for _ in range(10):  # 使用10个线程
         t = threading.Thread(target=worker, args=(hostname, q, success_event, attempt_count))
